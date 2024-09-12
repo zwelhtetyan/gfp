@@ -1,0 +1,20 @@
+{
+  "name": "ch7",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/ramda": "^0.30.2"
+  },
+  "scripts": {
+    "dev": "bun --watch index.ts"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "fp-ts": "^2.16.9",
+    "newtype-ts": "^0.3.5",
+    "ramda": "^0.30.1"
+  }
+}
