@@ -6,9 +6,11 @@ interface Artist {
   origin: Location;
   periodInYear: PeriodInYear;
 }
+
+type ActiveBetween = { start: number; end: number };
 type PeriodInYear =
-  | { type: "stillActive"; start: number }
-  | { type: "activeBetween"; start: number; end: number };
+  | { type: "stillActive"; since: number; periods?: ActiveBetween[] }
+  | { type: "yearsInPeriods"; periods: ActiveBetween[] };
 
 enum Genre {
   HipHop = "HipHop",
@@ -20,29 +22,55 @@ interface Location
   extends Newtype<{ readonly Location: unique symbol }, string> {}
 const isoLocation = iso<Location>();
 
-const wasActive = (artist: Artist, startYear: number, endYear: number) => {
+const periodOverlapsWithPeriods = (
+  searchPeriod: ActiveBetween,
+  periods: ActiveBetween[]
+): boolean => {
+  return periods.some(
+    (p) => p.start <= searchPeriod.end && p.end >= searchPeriod.start
+  );
+};
+
+const wasActive = (artist: Artist, searchPeriod: ActiveBetween): boolean => {
   switch (artist.periodInYear.type) {
     case "stillActive":
-      return artist.periodInYear.start <= endYear;
-    case "activeBetween":
-      const { end, start } = artist.periodInYear;
-      return start <= endYear && end >= startYear;
+      return (
+        artist.periodInYear.since <= searchPeriod.end ||
+        (artist.periodInYear.periods
+          ? periodOverlapsWithPeriods(searchPeriod, artist.periodInYear.periods)
+          : false)
+      );
+    case "yearsInPeriods":
+      return periodOverlapsWithPeriods(
+        searchPeriod,
+        artist.periodInYear.periods
+      );
   }
 };
 
-const activeLength = (artist: Artist, currentYear: number) => {
+const activeLength = (artist: Artist, currentYear: number): number => {
+  let periods: ActiveBetween[] = [];
   switch (artist.periodInYear.type) {
     case "stillActive":
-      return currentYear - artist.periodInYear.start;
-    case "activeBetween":
-      return artist.periodInYear.end - artist.periodInYear.start;
+      const prevPeriods = artist.periodInYear.periods || [];
+      periods = [
+        ...prevPeriods,
+        { start: artist.periodInYear.since, end: currentYear },
+      ];
+      break;
+    case "yearsInPeriods":
+      periods = [...artist.periodInYear.periods];
+      break;
   }
+
+  return periods.map((p) => p.end - p.start).reduce((a, b) => a + b, 0);
 };
 
 type SearchBy =
   | { type: "genre"; genres: Set<Genre> }
   | { type: "location"; locations: Set<Location> }
-  | { type: "activeYear"; start: number; end: number };
+  | { type: "activeYear"; period: ActiveBetween }
+  | { type: "activeLength"; howLong: number; until: number };
 
 const searchByGenre = (artist: Artist, genres: Set<Genre>): boolean => {
   return genres.size === 0 || genres.has(artist.genre);
@@ -55,18 +83,7 @@ const searchByLocation = (
   return locations.size === 0 || locations.has(artist.origin);
 };
 
-const searchByActiveYear = (
-  artist: Artist,
-  startYear: number,
-  endYear: number
-): boolean => {
-  return wasActive(artist, startYear, endYear);
-};
-
-const searchArtists = (
-  artists: Artist[],
-  searchBy: Set<SearchBy>
-): Artist[] => {
+const searchArtists = (artists: Artist[], searchBy: SearchBy[]): Artist[] => {
   return artists.filter((artist) => {
     return [...searchBy].every((searchCriteria) => {
       switch (searchCriteria.type) {
@@ -75,8 +92,11 @@ const searchArtists = (
         case "location":
           return searchByLocation(artist, searchCriteria.locations);
         case "activeYear":
-          const { start, end } = searchCriteria;
-          return searchByActiveYear(artist, start, end);
+          return wasActive(artist, searchCriteria.period);
+        case "activeLength":
+          return (
+            activeLength(artist, searchCriteria.until) >= searchCriteria.howLong
+          );
       }
     });
   });
@@ -88,32 +108,33 @@ const artists: Artist[] = [
     name: "Drake",
     genre: Genre.HipHop,
     origin: isoLocation.wrap("Los Angeles, CA"),
-    periodInYear: { type: "stillActive", start: 2012 },
+    periodInYear: { type: "stillActive", since: 2012 },
   },
   {
     name: "Bruno Mars",
     genre: Genre.Pop,
     origin: isoLocation.wrap("New York, NY"),
-    periodInYear: { type: "activeBetween", start: 2015, end: 2020 },
+    periodInYear: {
+      type: "yearsInPeriods",
+      periods: [{ start: 2015, end: 2020 }],
+    },
   },
   {
     name: "The Weeknd",
     genre: Genre.HipHop,
     origin: isoLocation.wrap("San Francisco, CA"),
-    periodInYear: { type: "stillActive", start: 2019 },
+    periodInYear: { type: "stillActive", since: 2019 },
   },
 ];
 
-const result = searchArtists(
-  artists,
-  new Set<SearchBy>([
-    { type: "genre", genres: new Set([Genre.HipHop]) },
-    {
-      type: "location",
-      locations: new Set([isoLocation.wrap("Los Angeles, CA")]),
-    },
-    // { type: "activeYear", start: 2015, end: 2020 },
-  ])
-);
+const result = searchArtists(artists, [
+  { type: "genre", genres: new Set([Genre.HipHop]) },
+  {
+    type: "location",
+    locations: new Set([isoLocation.wrap("Los Angeles, CA")]),
+  },
+  { type: "activeYear", period: { start: 2015, end: 2020 } },
+  { type: "activeLength", howLong: 5, until: 2022 },
+]);
 
 console.log(result);
