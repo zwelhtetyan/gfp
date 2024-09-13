@@ -1,4 +1,6 @@
+import { List } from "immutable";
 import { iso, type Newtype } from "newtype-ts";
+import { match } from "ts-pattern";
 
 interface Artist {
   name: string;
@@ -32,36 +34,26 @@ const periodOverlapsWithPeriods = (
 };
 
 const wasActive = (artist: Artist, searchPeriod: ActiveBetween): boolean => {
-  switch (artist.periodInYear.type) {
-    case "stillActive":
-      return (
-        artist.periodInYear.since <= searchPeriod.end ||
-        (artist.periodInYear.periods
-          ? periodOverlapsWithPeriods(searchPeriod, artist.periodInYear.periods)
-          : false)
-      );
-    case "yearsInPeriods":
-      return periodOverlapsWithPeriods(
-        searchPeriod,
-        artist.periodInYear.periods
-      );
-  }
+  return match(artist.periodInYear)
+    .with(
+      { type: "stillActive" },
+      ({ since, periods }) =>
+        since <= searchPeriod.end ||
+        (periods ? periodOverlapsWithPeriods(searchPeriod, periods) : false)
+    )
+    .with({ type: "yearsInPeriods" }, ({ periods }) =>
+      periodOverlapsWithPeriods(searchPeriod, periods)
+    )
+    .exhaustive();
 };
 
 const activeLength = (artist: Artist, currentYear: number): number => {
-  let periods: ActiveBetween[] = [];
-  switch (artist.periodInYear.type) {
-    case "stillActive":
-      const prevPeriods = artist.periodInYear.periods || [];
-      periods = [
-        ...prevPeriods,
-        { start: artist.periodInYear.since, end: currentYear },
-      ];
-      break;
-    case "yearsInPeriods":
-      periods = [...artist.periodInYear.periods];
-      break;
-  }
+  const periods = match(artist.periodInYear)
+    .with({ type: "stillActive" }, ({ since, periods }) =>
+      List(periods).push({ start: since, end: currentYear }).toArray()
+    )
+    .with({ type: "yearsInPeriods" }, ({ periods }) => periods)
+    .exhaustive();
 
   return periods.map((p) => p.end - p.start).reduce((a, b) => a + b, 0);
 };
@@ -85,20 +77,19 @@ const searchByLocation = (
 
 const searchArtists = (artists: Artist[], searchBy: SearchBy[]): Artist[] => {
   return artists.filter((artist) => {
-    return [...searchBy].every((searchCriteria) => {
-      switch (searchCriteria.type) {
-        case "genre":
-          return searchByGenre(artist, searchCriteria.genres);
-        case "location":
-          return searchByLocation(artist, searchCriteria.locations);
-        case "activeYear":
-          return wasActive(artist, searchCriteria.period);
-        case "activeLength":
-          return (
-            activeLength(artist, searchCriteria.until) >= searchCriteria.howLong
-          );
-      }
-    });
+    return searchBy.every((searchCriteria) =>
+      match(searchCriteria)
+        .with({ type: "genre" }, ({ genres }) => searchByGenre(artist, genres))
+        .with({ type: "location" }, ({ locations }) =>
+          searchByLocation(artist, locations)
+        )
+        .with({ type: "activeYear" }, ({ period }) => wasActive(artist, period))
+        .with(
+          { type: "activeLength" },
+          ({ howLong, until }) => activeLength(artist, until) >= howLong
+        )
+        .exhaustive()
+    );
   });
 };
 

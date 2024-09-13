@@ -1,4 +1,5 @@
 import { iso, type Newtype } from "newtype-ts";
+import { match } from "ts-pattern";
 
 enum MusicGenre {
   HipHop,
@@ -28,28 +29,23 @@ interface Playlist {
   songs: Song[];
 }
 
-const extractSongBaseOnKind = (
-  playlist: Playlist,
-  artist: Artist,
-  genre: MusicGenre
-) => {
-  switch (playlist.kind.type) {
-    case "basedOnUser":
-      return playlist.songs.filter((song) => song.artist === artist);
-    case "basedOnArtist":
-      return playlist.kind.artist === artist ? playlist.songs : [];
-    case "basedOnGenre":
-      return playlist.kind.genres.has(genre) ? playlist.songs : [];
-  }
-};
-
 const gatherSongs = (
   playlists: Playlist[],
   artist: Artist,
   genre: MusicGenre
 ): Song[] => {
   return playlists.flatMap((playlist) =>
-    extractSongBaseOnKind(playlist, artist, genre)
+    match(playlist.kind)
+      .with({ type: "basedOnUser" }, () =>
+        playlist.songs.filter((song) => song.artist === artist)
+      )
+      .with({ type: "basedOnArtist" }, ({ artist: _artist }) =>
+        _artist == artist ? playlist.songs : []
+      )
+      .with({ type: "basedOnGenre" }, ({ genres: _genres }) =>
+        _genres.has(genre) ? playlist.songs : []
+      )
+      .exhaustive()
   );
 };
 
