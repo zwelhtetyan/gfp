@@ -43,7 +43,7 @@ object ch08_SchedulingMeetings {
       possibleMeetings = possibleMeetings(existingMeetings, 8, 16, lengthHours)
       meeting = possibleMeetings.headOption
       _ <- meeting match {
-        case Some(m) => createMeeting(List(person1, person2), m)
+        case Some(m) => createMeeting(List(persons), m)
         case None => IO.unit // same as IO.pure(())
       }
     } yield meeting
