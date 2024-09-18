@@ -99,5 +99,10 @@ const schedule = (
 };
 
 const program = schedule(List(["Alice", "Bob"]), 1);
-const result = program(); // unsafe call
-console.log(result);
+// unsafe call
+try {
+  const result = program();
+  console.log(result);
+} catch (err) {
+  console.log("Error lay pr shint 🙅‍♀️");
+}
