@@ -67,17 +67,14 @@ object Learn {
       } yield result
     }
 
-    val program = exchangeCurrency(Currency("USD"), Currency("EUR"), 111)
-    // program.unsafeRunSync()
-
     // Stream based implementation
     def rateStream(from: Currency, to: Currency): Stream[IO, BigDecimal] = {
       Stream.eval(exchangeTableApi(from)).repeat.map(extractSingleCurrencyRate(to)).unNone.orElse(rateStream(from, to))
     }
-
+    
     val delay: FiniteDuration = FiniteDuration(1, TimeUnit.SECONDS)
     val ticks: Stream[IO, Unit] = Stream.fixedRate[IO](delay)
-
+    
     def streamBasedExchangeCurrency(from: Currency, to: Currency, amount: BigDecimal): IO[BigDecimal] = {
       rateStream(from, to)
       .zipLeft(ticks)
@@ -90,4 +87,8 @@ object Learn {
       .lastOrError
       .map(_ * amount)
     }
+
+    // val program = exchangeCurrency(Currency("USD"), Currency("EUR"), 111)
+    // val program = streamBasedExchangeCurrency(Currency("USD"), Currency("EUR"), 111)
+    // program.unsafeRunSync()
   }
