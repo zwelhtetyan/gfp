@@ -4,21 +4,18 @@ import cats.effect.unsafe.implicits.global
 
 import scala.util.Try
 
-case class MeetingTime(startHour: Int, endHour: Int)
-
-object ch08_SchedulingMeetings {
+object Learn {
   // unsafe api call function
   def calendarEntriesApiCall(name: String): List[MeetingTime] = {
     import scala.jdk.CollectionConverters._
     ch08_SchedulingMeetingsAPI.calendarEntriesApiCall(name).asScala.toList
   }
-
+  
   def createMeetingApiCall(names: List[String], meetingTime: MeetingTime): Unit = {
     import scala.jdk.CollectionConverters._
     ch08_SchedulingMeetingsAPI.createMeetingApiCall(names.asJava, meetingTime)
   }
 
-  // pure IO function
   def calendarEntries(name: String): IO[List[MeetingTime]] = {
     IO.delay(calendarEntriesApiCall(name))
   }
@@ -27,35 +24,43 @@ object ch08_SchedulingMeetings {
     IO.delay(createMeetingApiCall(names, meetingTime))
   }
 
-  def scheduledMeetings(persons: List[String]): IO[List[MeetingTime]] = {
-    persons.map(p => retry(calendarEntries(p), 10)).sequence.map(_.flatten)
+  // implementation
+  case class HourBetween(start: Int, end: Int)
+
+  def availableSlotsForGivenHours(lengthHour: Int, between: HourBetween): List[MeetingTime] = {
+    List.range(between.start, between.end - lengthHour + 1).map(start => MeetingTime(start, start + lengthHour))
   }
 
-  def possibleMeetings(existingMeetings: List[MeetingTime], startHour: Int, endHour: Int, lengthHours: Int): List[MeetingTime] = {
-    val slots = List.range(startHour, endHour - lengthHours + 1).map(start => MeetingTime(start, start + lengthHours))
-
-    slots.filter(slot => existingMeetings.forall(m => !(m.endHour > slot.startHour && slot.endHour > m.startHour)))
+  def availableMeetingsForEachAttendee(attendees: List[String]): IO[List[MeetingTime]] = {
+    attendees.map(attendee => retry(calendarEntries(attendee), 11)).sequence.map(_.flatten)
   }
 
-  def schedule(persons: List[String], lengthHours: Int): IO[Option[MeetingTime]] = {
+  def possibleMeetings(existingMeetings: List[MeetingTime], between: HourBetween, lengthHour: Int): List[MeetingTime] = {
+    val availableSlots = availableSlotsForGivenHours(lengthHour, between)
+
+    availableSlots.filter(slot => existingMeetings.forall(m => !(m.endHour > slot.startHour && slot.endHour > m.startHour)))
+  }
+
+  def schedule(attendees: List[String], lengthHour: Int): IO[Option[MeetingTime]] = {
     for {
-      existingMeetings <- scheduledMeetings(persons)
-      possibleMeetings = possibleMeetings(existingMeetings, 8, 16, lengthHours)
-      meeting = possibleMeetings.headOption
-      _ <- meeting match {
-        case Some(m) => createMeeting(List(persons), m)
-        case None => IO.unit // same as IO.pure(())
+      existingMeetings <- availableMeetingsForEachAttendee(attendees)
+      meetings = possibleMeetings(existingMeetings, HourBetween(8, 16), lengthHour)
+      meeting = meetings.headOption
+      _ = meeting match {
+        case Some(meeting) => createMeeting(attendees, meeting)
+        case None => IO.unit
       }
     } yield meeting
   }
 
   def retry[A](action: IO[A], maxRetries: Int): IO[A] = {
-    List.range(0, maxRetries).map(_ => action).foldLeft(action)(program, retryAction) = {
-      program.orElse(retryAction)
-    }
+    List
+      .range(0, maxRetries)
+      .map(_ => action)
+      .foldLeft(action)((program, retryAction) =>program.orElse(retryAction))
   }
 
-  val program: IO[Option[MeetingTime]] = schedule("Alice", "Bob", 1)
-  program.unsafeRunSync()
+  // val program: IO[Option[MeetingTime]] = schedule(List("Alice", "Bob"), 1)
+  // program.unsafeRunSync()
 }
 
