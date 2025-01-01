@@ -10,29 +10,33 @@ public class ch09_Stream123s {
         Stream<Integer> numbers = Stream.of(1, 2, 3);
         Stream<Integer> oddNumbers = oddNumbers(numbers);
         List<Integer> result = oddNumbers.collect(Collectors.toList());
-        assert(result.equals(List.of(1, 3)));
-        // System.out.println(numbers.count()); // not possible because we can't reuse Java Streams
+        assert (result.equals(List.of(1, 3)));
+        // System.out.println(numbers.count()); // not possible because we can't reuse
+        // Java Streams
 
         Stream<Integer> infiniteNumbers = Stream.iterate(0, i -> i + 1);
         Stream<Integer> infiniteOddNumbers = oddNumbers(infiniteNumbers);
 
-        // List<Integer> infiniteResult = infiniteOddNumbers.collect(Collectors.toList());
+        // List<Integer> infiniteResult =
+        // infiniteOddNumbers.collect(Collectors.toList());
         Stream<Integer> limitedStream = infiniteOddNumbers.limit(3);
         List<Integer> limitedResult = limitedStream.collect(Collectors.toList());
-        assert(limitedResult.equals(List.of(1, 3, 5)));
+        assert (limitedResult.equals(List.of(1, 3, 5)));
 
-        // Stream<Integer> oddNumbersStream = numbers.filter(n -> n % 2 != 0); // not possible because we can't reuse Java Streams
+        // Stream<Integer> oddNumbersStream = numbers.filter(n -> n % 2 != 0); // not
+        // possible because we can't reuse Java Streams
 
         Stream<Integer> randomNumbers = Stream.generate(new Random()::nextInt);
         List<Integer> randomResult = oddNumbers(randomNumbers).limit(3).collect(Collectors.toList());
         System.out.println(randomResult);
 
-        Stream<Map<String, BigDecimal>> usdRates = Stream.generate(() -> ch09_CurrencyExchangeImpure.exchangeRatesTableApiCall("USD"));
+        Stream<Map<String, BigDecimal>> usdRates = Stream
+                .generate(() -> ch09_CurrencyExchangeImpure.exchangeRatesTableApiCall("USD"));
         try {
             System.out.println("The following will throw: ");
             usdRates.limit(10).collect(Collectors.toList());
             System.out.println("Most probably won't happen!");
-        } catch(Exception e) {
+        } catch (Exception e) {
             System.out.println("Exception thrown: " + e.getMessage());
         }
     }
@@ -41,18 +45,19 @@ public class ch09_Stream123s {
         return numbers.filter(n -> n % 2 != 0);
     }
 
-    /** in Python:
+    /**
+     * in Python:
      * import itertools
      *
      * def infinite_numbers():
-     *     x=0
-     *     while(True):
-     *         x=x+1
-     *         yield x
+     * x=0
+     * while(True):
+     * x=x+1
+     * yield x
      *
      *
      * def odd_numbers(numbers):
-     *     return filter(lambda i: i%2 != 0, numbers)
+     * return filter(lambda i: i%2 != 0, numbers)
      *
      * infinite_odd_numbers = odd_numbers(infinite_numbers())
      *
