@@ -13,7 +13,6 @@ import type { DataAccess } from "./types/dataAccess.type";
 import { dataAccess } from "./api/dataAccess";
 
 // Business Logic
-// TODO: Try parallel
 const travelGuide = (
   dataAccess: DataAccess,
   name: string
